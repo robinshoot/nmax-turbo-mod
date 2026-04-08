@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Post {
+  id        String    @id @default(cuid())
+  title     String
+  slug      String    @unique
+  summary   String
+  content       String
+  modifiedParts ModifiedPart[]
+  imageUrl      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tags      Tag[]
+  comments  Comment[]
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  slug  String @unique
+  posts Post[]
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  content    String
+  authorName String
+  createdAt  DateTime @default(now())
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId     String
+}
+
+model ModifiedPart {
+  id          String @id @default(cuid())
+  name        String
+  status      String
+  description String @default("")
+  post        Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId      String
+}

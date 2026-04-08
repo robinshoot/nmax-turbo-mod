@@ -1,12 +1,46 @@
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import CommentSection from "@/components/CommentSection";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, Calendar, Tag as TagIcon, Wrench, CheckCircle2 } from "lucide-react";
+import BlogArchiveSidebar from "@/components/BlogArchiveSidebar";
 
 export const revalidate = 10;
 
-export default async function PostPage(props: { params: Promise<{ slug: string }> }) {
+type Props = {
+  params: Promise<{ slug: string }>;
+};
+
+export async function generateStaticParams() {
+  const posts = await prisma.post.findMany({ select: { slug: true } });
+  return posts.map((post) => ({
+    slug: post.slug,
+  }));
+}
+
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
+  const post = await prisma.post.findUnique({
+    where: { slug: params.slug },
+    select: { title: true, summary: true, imageUrl: true }
+  });
+
+  if (!post) {
+    return { title: "Post Not Found" };
+  }
+
+  return {
+    title: `${post.title} | NMAX Turbo Modifikasi`,
+    description: post.summary,
+    openGraph: {
+      images: [post.imageUrl],
+    },
+  };
+}
+
+export default async function PostPage(props: Props) {
   const params = await props.params;
   const post = await prisma.post.findUnique({
     where: { slug: params.slug },
@@ -24,11 +58,14 @@ export default async function PostPage(props: { params: Promise<{ slug: string }
   }
 
   return (
-    <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <Link href="/" className="inline-flex items-center gap-2 text-accent hover:text-white transition-colors mb-8 group font-semibold">
         <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
         Kembali ke Beranda
       </Link>
+
+      <div className="flex flex-col lg:flex-row gap-12 items-start">
+        <article className="flex-1 w-full max-w-4xl">
 
       <div className="opacity-0 animate-fade-in-up" style={{ animationFillMode: 'forwards' }}>
         <div className="flex flex-wrap gap-2 mb-6">
@@ -46,18 +83,19 @@ export default async function PostPage(props: { params: Promise<{ slug: string }
 
         <div className="flex items-center gap-2 text-gray-400 mb-10 pb-6 border-b border-secondary/30">
           <Calendar size={18} />
-          <span>
+          <span suppressHydrationWarning>
             {new Intl.DateTimeFormat("id-ID", { dateStyle: "long" }).format(post.createdAt)}
           </span>
         </div>
       </div>
 
       <div className="aspect-video w-full rounded-3xl overflow-hidden mb-12 border border-secondary/20 shadow-2xl relative opacity-0 animate-fade-in-up" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img 
+        <Image 
           src={post.imageUrl} 
           alt={post.title}
-          className="w-full h-full object-cover"
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background to-transparent"></div>
       </div>
@@ -111,6 +149,10 @@ export default async function PostPage(props: { params: Promise<{ slug: string }
       <div className="opacity-0 animate-fade-in-up" style={{ animationDelay: '600ms', animationFillMode: 'forwards' }}>
         <CommentSection postId={post.id} initialComments={post.comments} />
       </div>
-    </article>
+        </article>
+
+        <BlogArchiveSidebar currentSlug={post.slug} />
+      </div>
+    </div>
   );
 }

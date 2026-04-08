@@ -1,6 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { ArrowRight, MessageSquare } from "lucide-react";
+import BlogArchiveSidebar from "@/components/BlogArchiveSidebar";
 
 // Add unstable_cache or just rely on Next.js default revalidation
 export const revalidate = 10;
@@ -27,7 +29,9 @@ export default async function Home() {
         </p>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="flex flex-col lg:flex-row gap-12 items-start">
+        <div className="flex-1 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
         {posts.map((post, index) => (
           <Link href={`/posts/${post.slug}`} key={post.id} className="group">
             <article 
@@ -35,11 +39,12 @@ export default async function Home() {
               style={{ animationDelay: `${index * 150}ms`, animationFillMode: 'forwards' }}
             >
               <div className="aspect-video w-full overflow-hidden relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img 
+                <Image 
                   src={post.imageUrl} 
                   alt={post.title} 
-                  className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-60"></div>
               </div>
@@ -71,6 +76,10 @@ export default async function Home() {
             </article>
           </Link>
         ))}
+          </div>
+        </div>
+        
+        <BlogArchiveSidebar />
       </div>
     </div>
   );

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useActionState, useRef } from "react";
 import { MessageSquare, Send, User } from "lucide-react";
+import { addComment, type CommentState } from "@/app/actions/comments";
 
 type Comment = {
   id: string;
   authorName: string;
   content: string;
-  createdAt: Date;
+  createdAt: Date | string; // Adjusted to handle serialised Dates from server action
 };
 
 export default function CommentSection({
@@ -18,39 +19,34 @@ export default function CommentSection({
   initialComments: Comment[];
 }) {
   const [comments, setComments] = useState<Comment[]>(initialComments);
-  const [name, setName] = useState("");
-  const [content, setContent] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const [state, formAction, isPending] = useActionState<CommentState, FormData>(
+    addComment,
+    { success: false, message: "" }
+  );
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || !content.trim()) return;
-
-    setIsSubmitting(true);
-    try {
-      const res = await fetch("/api/comments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId, authorName: name, content }),
-      });
-
-      if (res.ok) {
-        const newComment = await res.json();
-        setComments([...comments, { ...newComment, createdAt: new Date(newComment.createdAt) }]);
-        setName("");
-        setContent("");
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
+  // Update localized comments when action succeeds so we don't need a hard reload
+  useEffect(() => {
+    if (state.success && state.newComment) {
+      setComments((prev) => [...prev, state.newComment!]);
+      formRef.current?.reset(); // reset form fields via DOM
     }
-  };
+  }, [state]);
+
+  // Keep up-to-date with server revalidations pushing new initialComments
+  useEffect(() => {
+    // If the server revalidates and pushes more comments via props, sync it!
+    if (initialComments.length > comments.length && !state.success) {
+      setComments(initialComments);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialComments]); 
 
   return (
     <div className="mt-16 bg-secondary/5 border border-secondary/20 rounded-2xl p-6 md:p-8">
@@ -90,33 +86,49 @@ export default function CommentSection({
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-secondary/20 pt-8">
+      <form ref={formRef} action={formAction} className="border-t border-secondary/20 pt-8">
         <h4 className="font-semibold mb-4 text-lg">Tinggalkan Komentar</h4>
+        <input type="hidden" name="postId" value={postId} />
+        
         <div className="grid gap-4">
-          <input
-            type="text"
-            placeholder="Nama Anda"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full md:w-1/2 bg-black/30 border border-secondary/30 rounded-xl px-4 py-3 outline-none focus:border-accent transition-colors text-white"
-            required
-            disabled={isSubmitting}
-          />
-          <textarea
-            placeholder="Tuliskan pendapat atau pertanyaan Anda..."
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={4}
-            className="w-full bg-black/30 border border-secondary/30 rounded-xl px-4 py-3 outline-none focus:border-accent transition-colors text-white resize-y"
-            required
-            disabled={isSubmitting}
-          />
+          <div>
+            <input
+              type="text"
+              name="authorName"
+              placeholder="Nama Anda"
+              className="w-full md:w-1/2 bg-black/30 border border-secondary/30 rounded-xl px-4 py-3 outline-none focus:border-accent transition-colors text-white"
+              required
+              disabled={isPending}
+            />
+            {state.errors?.authorName && (
+              <p className="text-red-400 text-sm mt-1">{state.errors.authorName[0]}</p>
+            )}
+          </div>
+          
+          <div>
+            <textarea
+              name="content"
+              placeholder="Tuliskan pendapat atau pertanyaan Anda..."
+              rows={4}
+              className="w-full bg-black/30 border border-secondary/30 rounded-xl px-4 py-3 outline-none focus:border-accent transition-colors text-white resize-y"
+              required
+              disabled={isPending}
+            />
+            {state.errors?.content && (
+              <p className="text-red-400 text-sm mt-1">{state.errors.content[0]}</p>
+            )}
+          </div>
+
+          {!state.success && state.message && (
+            <p className="text-red-400 text-sm font-semibold">{state.message}</p>
+          )}
+
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isPending}
             className="flex justify-center items-center gap-2 bg-accent hover:bg-[#b89568] text-white font-bold py-3 px-6 rounded-xl transition-all shadow-[0_4px_14px_0_rgba(165,131,86,0.39)] disabled:opacity-50 md:w-fit"
           >
-            {isSubmitting ? "Mengirim..." : "Kirim Komentar"}
+            {isPending ? "Mengirim..." : "Kirim Komentar"}
             <Send size={18} />
           </button>
         </div>
